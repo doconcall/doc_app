@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="email" type="id"/>
+    <item name="password" type="id"/>
+    <item name="name" type="id"/>
+    <item name="phone" type="id"/>
+    <item name="history" type="id"/>
+    <item name="designation" type="id"/>
+    <item name="accepted" type="id"/>
+    <item name="total" type="id"/>
+</resources>
