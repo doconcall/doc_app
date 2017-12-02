@@ -46,6 +46,7 @@ public class PowerButtonListener extends BroadcastReceiver
 	FusedLocationProvider locationProvider = null;
 	
 	public PowerButtonListener(ApplicationWrapper wrapper) {
+		//initialize with location service
 		locationProvider = new FusedLocationProvider(this.wrapper = wrapper,
 			this);
 	}
@@ -54,11 +55,14 @@ public class PowerButtonListener extends BroadcastReceiver
 	public void onReceive(Context context, Intent intent) {
 		this.context = context;
 		String action = intent.getAction();
+		//return if location permission wasn't provided
 		if (action == null || (!action.equals(Intent.ACTION_SCREEN_OFF) && !action.equals(Intent.ACTION_SCREEN_ON)) ||
 			ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
 			return;
+		//get the delta between emerging clicks
 		long epoch = System.currentTimeMillis(), delta = epoch - lastEpoch;
 		Log.i(TAG, "onReceive: " + delta);
+		//click should happen before 1200ms
 		if (delta < 1200)
 			clickCount++;
 		else clickCount = 1;
@@ -68,6 +72,7 @@ public class PowerButtonListener extends BroadcastReceiver
 		if (clickCount < 5) return;
 		
 		clickCount = 0;
+		//user pressed the button 5 times, we go async and get location of the user
 		result = goAsync();
 		if (locationProvider == null)
 			locationProvider = new FusedLocationProvider(this.wrapper, this);
@@ -79,12 +84,15 @@ public class PowerButtonListener extends BroadcastReceiver
 	
 	@Override
 	public void onLastLocation(List<Location> locations) {
+		//we don't have a location thus we return
 		if (locations.size() < 1) {
 			Toast.makeText(context, "Unable to lock location!", Toast.LENGTH_LONG).show();
 			return;
 		}
+		//we have the last location, stop further location updates
 		locationProvider.stopUpdates();
 		Location lastLocation = locations.get(0);
+		//build the network request with relevant information and make the network request
 		try {
 			JSONObject sos = new JSONObject();
 			sos.putOpt("cid", wrapper.getEmail());
@@ -110,6 +118,7 @@ public class PowerButtonListener extends BroadcastReceiver
 	@Override
 	public void onFailure(@NonNull Call call, @NonNull IOException e) {
 		e.printStackTrace();
+		//finish this receiver anyway
 		Looper.prepare();
 		result.finish();
 		Looper.loop();
@@ -118,6 +127,7 @@ public class PowerButtonListener extends BroadcastReceiver
 	@Override
 	public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
 		Looper.prepare();
+		//get the response body and return if we error out
 		ResponseBody body = response.body();
 		String res = null;
 		if (body == null || (res = body.string()).contains("errors")) {
@@ -127,10 +137,11 @@ public class PowerButtonListener extends BroadcastReceiver
 			return;
 		}
 		Log.i(TAG, "onResponse: " + res);
-		wrapper.setLatestSOS(res)
-		       .extendRange(60000);
+		//we set latest sos and start periodic range extension
+		wrapper.setLatestSOS(res).extendRange();
 		
 		try {
+			//build and show notification
 			NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 			if (manager != null)
 				manager.notify(1001, new NotificationCompat.Builder(context, ApplicationWrapper.requestChannel.first)
@@ -147,8 +158,9 @@ public class PowerButtonListener extends BroadcastReceiver
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
-		
+		//send MainActivity a broadcast to update it's database
 		wrapper.sendBroadcast(new Intent(ApplicationWrapper.ACTION_PUSH_NOTIFICATION));
+		//finish since we've done our work
 		result.finish();
 		Looper.loop();
 	}

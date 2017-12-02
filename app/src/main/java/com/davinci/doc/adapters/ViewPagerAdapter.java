@@ -12,8 +12,8 @@ import java.util.ArrayList;
 
 /**
  * Created by aakash on 10/25/17.
+ * Adapter for showing respective pages
  */
-
 public class ViewPagerAdapter extends FragmentPagerAdapter {
 
 	private ArrayList<FragmentDataItem> fragmentData = new ArrayList<>();
@@ -45,10 +45,5 @@ public class ViewPagerAdapter extends FragmentPagerAdapter {
 	@Override
 	public CharSequence getPageTitle(int position) {
 		return fragmentData.get(position).getId();
-	}
-
-	@Override
-	public void notifyDataSetChanged() {
-		super.notifyDataSetChanged();
 	}
 }

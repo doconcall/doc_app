@@ -11,8 +11,8 @@ import java.util.TimerTask;
 
 /**
  * Created by aakash on 11/3/17.
+ * All sos and transit request
  */
-
 public class QueuedRequest extends TimerTask {
 
 	private String id = null;
@@ -37,10 +37,13 @@ public class QueuedRequest extends TimerTask {
 	}
 
 	public void clearSelf(boolean shouldRemove) {
+		//clear the notification if it exists
 		NotificationManager manager = (NotificationManager) wrapper.getSystemService(Context.NOTIFICATION_SERVICE);
 		if (manager != null)
 			manager.cancel(this.notificationID);
 		timeout.cancel();
+		
+		//update the server that we're declining this request
 		wrapper.declineRequest(this.id);
 		if (shouldRemove) {
 			ArrayList<QueuedRequest> queuedRequests = wrapper.getQueuedRequests();

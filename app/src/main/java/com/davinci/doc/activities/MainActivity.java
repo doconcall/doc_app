@@ -66,12 +66,17 @@ public class MainActivity extends AppCompatActivity
 	ArrayList<FragmentDataItem> fragmentData = new ArrayList<>();
 	ViewPager viewPager = null;
 	
+	//determines if we're returning from an orientation change
 	boolean orientation = false;
+	//the request we give to location provider for location updates
 	LocationRequest request = null;
+	//provides location
 	FusedLocationProvider locationProvider = null;
+	//holds the last known location of the user
 	LatLng lastLocation = null;
 	AlertDialog dialog = null;
 	
+	//refreshes the activity if a notification arrives or notification actions are clicked
 	BroadcastReceiver pushNotificationListener = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -84,10 +89,12 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
 		wrapper = (ApplicationWrapper) getApplication();
+		
+		setContentView(R.layout.activity_main);
 		findViewById(R.id.refresh).setOnClickListener(this);
 		
+		//initialize the viewpager
 		viewPager = findViewById(R.id.viewPager);
 		adapter = new ViewPagerAdapter(getSupportFragmentManager(), fragmentData);
 		ViewPager viewPager = findViewById(R.id.viewPager);
@@ -95,31 +102,40 @@ public class MainActivity extends AppCompatActivity
 		((TabLayout) findViewById(R.id.tabIndicator))
 			.setupWithViewPager(viewPager, true);
 		
+		//initialize sos click button
 		View view = findViewById(R.id.sos);
 		view.setOnClickListener(this);
+		//set coordinates if the activity was start again after an exit
 		setCoordinates(wrapper.getLocation());
+		//initialize the pages
 		init();
-		if (savedInstanceState != null)
-			orientation = savedInstanceState.getBoolean("orientation");
+		//determines if orientation was changed
+		if (savedInstanceState != null) orientation = savedInstanceState.getBoolean("orientation");
+			//else activity is returning after an exit, we want to refetch all the information again
 		else wrapper.clear();
 	}
 	
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
 		super.onSaveInstanceState(outState);
+		//we're undergoing an orientation change
 		outState.putBoolean("orientation", orientation);
 	}
 	
 	@Override
 	protected void onStart() {
 		super.onStart();
+		//if we don't have credentials, we start the login child activity
 		if (wrapper.getEmail().equals(""))
 			startActivityForResult(new Intent(this, LoginActivity.class), 0);
 		else {
+			//check and ask for location permissions
 			if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
 				!= PackageManager.PERMISSION_GRANTED)
 				ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1111);
+				//if we've them we start location service
 			else startLocationService();
+			//we return if we don't have an internet connection
 			if (!ApplicationWrapper.isNetworkConnected(this) || !ApplicationWrapper.isInternetAccessible()) {
 				Toast.makeText(this, "Internet not accessible", Toast.LENGTH_SHORT).show();
 				return;
@@ -131,6 +147,7 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if (requestCode != 0) return;
+		//if login was successful, we update firebase token on the server to receive notifications
 		switch (resultCode) {
 			case Activity.RESULT_OK:
 				wrapper.getClient()
@@ -152,13 +169,17 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	protected void onResume() {
 		super.onResume();
+		//start getting location updates
 		if (locationProvider != null && request != null) locationProvider.getUpdates(request);
+		//register for custom notification update event
 		registerReceiver(pushNotificationListener, new IntentFilter(ApplicationWrapper.ACTION_PUSH_NOTIFICATION));
 	}
 	
 	@Override
 	protected void onPause() {
+		//unregister to avoid memory leaks
 		unregisterReceiver(pushNotificationListener);
+		//stop getting location updates
 		if (locationProvider != null && request != null) locationProvider.stopUpdates();
 		super.onPause();
 	}
@@ -171,6 +192,7 @@ public class MainActivity extends AppCompatActivity
 			//finish();
 			return;
 		}
+		//if permission was granted we start getting the location updated
 		Toast.makeText(this, "Location permission granted", Toast.LENGTH_SHORT).show();
 		startLocationService();
 	}
@@ -178,13 +200,16 @@ public class MainActivity extends AppCompatActivity
 	@Override
 	public void onClick(View view) {
 		switch (view.getId()) {
+			//refresh the entire data
 			case R.id.refresh:
 				refresh();
 				Toast.makeText(this, "Refreshing data", Toast.LENGTH_LONG).show();
 				break;
 			case R.id.sos:
+				//show note dialog if user is a client and sos was clicked
 				if (wrapper.getType().equals("client")) showNoteDialog();
 				else {
+					//else the doctor or transit wants to navigate to the coordinates received
 					LatLng location = wrapper.getLocation();
 					if (location == null) return;
 					startActivity(new Intent(Intent.ACTION_VIEW, new Uri.Builder()
@@ -228,6 +253,7 @@ public class MainActivity extends AppCompatActivity
 			}
 			String res = null;
 			try {
+				//get the response body and return if we error out
 				if (body == null || (res = body.string()).contains("errors")) {
 					Log.i(ApplicationWrapper.TAG, "onResponse: Error(" + res + ")");
 					MainActivity.this.runOnUiThread(() ->
@@ -237,16 +263,18 @@ public class MainActivity extends AppCompatActivity
 				}
 				Log.i(ApplicationWrapper.TAG, "onResponse: " + res);
 				switch ((String) call.request().tag()) {
+					//deviceID was updated to the server
 					case "deviceID":
 						Toast.makeText(MainActivity.this,
 							"Server updated successfully", Toast.LENGTH_LONG).show();
 						break;
+					//sos was broadcasted, we set the latest sos and begin extending range of that sos
 					case "sos":
-						wrapper.setLatestSOS(res)
-							.extendRange(60000);
+						wrapper.setLatestSOS(res).extendRange();
 						refresh();
 						Toast.makeText(this, "SOS broadcast successful", Toast.LENGTH_LONG).show();
 						break;
+					//we've received user's information, we update the respective page
 					case "info":
 						try {
 							FragmentDataItem dataItem = findDataItem("Info");
@@ -255,6 +283,7 @@ public class MainActivity extends AppCompatActivity
 								adapter.notifyDataSetChanged();
 							} else {
 								dataItem.setData(wrapper.setInfo(res));
+								//get information page
 								InfoFragment fragment = (InfoFragment) getPage(0);
 								if (fragment != null)
 									fragment.setData((JSONObject) dataItem.getData());
@@ -263,13 +292,16 @@ public class MainActivity extends AppCompatActivity
 							e.printStackTrace();
 						}
 						break;
+					//we've received user's sos history, we update the respective page
 					case "sosHistory":
 						try {
+							//add the data item if it doesn't exists
 							FragmentDataItem dataItem = findDataItem("SOS History");
 							if (dataItem == null) {
 								fragmentData.add(1, new FragmentDataItem("SOS History", wrapper.setSOSHistory(res)));
 								adapter.notifyDataSetChanged();
 							} else {
+								//else update it and update the fragment's data too
 								dataItem.setData(wrapper.setSOSHistory(res));
 								RequestFragment fragment = (RequestFragment) getPage(1);
 								if (fragment != null)
@@ -279,12 +311,15 @@ public class MainActivity extends AppCompatActivity
 							e.printStackTrace();
 						}
 						break;
+					//we've received user's transit history, we update the respective page
 					case "transitHistory":
 						try {
+							//add the data item if it doesn't exists
 							FragmentDataItem dataItem = findDataItem("Transit History");
 							if (dataItem == null)
 								fragmentData.add(new FragmentDataItem("Transit History", wrapper.setTransitHistory(res)));
 							else {
+								//else update it and update the fragment's data too
 								dataItem.setData(wrapper.setTransitHistory(res));
 								RequestFragment fragment = (RequestFragment) getPage(wrapper.getType().equals("doctor") ? 2 : 1);
 								if (fragment != null)
@@ -304,6 +339,7 @@ public class MainActivity extends AppCompatActivity
 	
 	@Override
 	public void onBackPressed() {
+		//goto first page if not on first page
 		if (viewPager.getCurrentItem() != 0) {
 			viewPager.setCurrentItem(0);
 			return;
@@ -311,10 +347,12 @@ public class MainActivity extends AppCompatActivity
 		super.onBackPressed();
 	}
 	
+	//convenience method to get viewpager's fragment
 	private Fragment getPage(int position) {
 		return getSupportFragmentManager().findFragmentByTag("android:switcher:" + R.id.viewPager + ":" + position);
 	}
 	
+	//convenience method to initialize all the pages
 	private void init() {
 		String type = wrapper.getType();
 		fragmentData.clear();
@@ -326,6 +364,7 @@ public class MainActivity extends AppCompatActivity
 		adapter.notifyDataSetChanged();
 	}
 	
+	//convenience method to find data item if it exists with email id
 	@Nullable
 	private FragmentDataItem findDataItem(String id) {
 		for (FragmentDataItem item : fragmentData)
@@ -333,11 +372,14 @@ public class MainActivity extends AppCompatActivity
 		return null;
 	}
 	
+	//we get user's all information
 	private void fetchData() {
 		JSONObject data;
+		//if we don't have information yet, we request info
 		if ((data = wrapper.getInfo()) == null)
 			requestInfo();
 		else {
+			//else we update the page with information we have
 			FragmentDataItem dataItem = findDataItem("Info");
 			if (dataItem != null) {
 				dataItem.setData(data);
@@ -349,7 +391,9 @@ public class MainActivity extends AppCompatActivity
 		String type = wrapper.getType();
 		switch (type) {
 			case "client":
+				//get sos history if we don't have it
 				if (wrapper.getSOSHistory() == null) requestSOSHistory();
+				//initialize all location variables to be able to receive location updates
 				request = new LocationRequest()
 					.setInterval(30000)
 					.setFastestInterval(30000)
@@ -357,15 +401,19 @@ public class MainActivity extends AppCompatActivity
 				locationProvider = new FusedLocationProvider(this, this);
 				break;
 			case "doctor":
+				//get sos history if we don't have it
 				if (wrapper.getSOSHistory() == null) requestSOSHistory();
+				//get transit history if we don't have it
 				if (wrapper.getTransitHistory() == null) requestTransitHistory();
 				break;
 			case "transit":
+				//get transit history if we don't have it
 				if (wrapper.getTransitHistory() == null) requestTransitHistory();
 				break;
 		}
 	}
 	
+	//convenience method to get user information
 	private void requestInfo() {
 		String type = wrapper.getType();
 		wrapper.getClient()
@@ -378,6 +426,7 @@ public class MainActivity extends AppCompatActivity
 			.enqueue(this);
 	}
 	
+	//convenience method to get user's sos history
 	private void requestSOSHistory() {
 		wrapper.getClient()
 			.newCall(wrapper
@@ -389,6 +438,7 @@ public class MainActivity extends AppCompatActivity
 			.enqueue(this);
 	}
 	
+	//convenience method to get user's transit history
 	private void requestTransitHistory() {
 		wrapper.getClient()
 			.newCall(wrapper
@@ -400,6 +450,7 @@ public class MainActivity extends AppCompatActivity
 			.enqueue(this);
 	}
 	
+	//refreshes all the data
 	public void refresh() {
 		requestInfo();
 		String type = wrapper.getType();
@@ -410,7 +461,10 @@ public class MainActivity extends AppCompatActivity
 		setCoordinates(wrapper.getLocation());
 	}
 	
+	//starts the location service
 	private void startLocationService() {
+		//start the location service if we're doctor or transit service and location permissions are granted
+		//and internet is accessible
 		if (!wrapper.getType().equals("client") && wrapper.getPersistentId() == -1 &&
 			ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 			&& ApplicationWrapper.isNetworkConnected(this) && ApplicationWrapper.isInternetAccessible())
@@ -418,6 +472,7 @@ public class MainActivity extends AppCompatActivity
 		//else Log.i(ApplicationWrapper.TAG, "startLocationService: " + wrapper.getPersistentId());
 	}
 	
+	//convenience method to show an sos request is being broadcasted
 	private void showSOSDialog() {
 		ConstraintLayout root = (ConstraintLayout) LayoutInflater.from(this).inflate(R.layout.dialog_login, findViewById(R.id.root), false);
 		((TextView) root.findViewById(R.id.content))
@@ -431,12 +486,15 @@ public class MainActivity extends AppCompatActivity
 		dialog.show();
 	}
 	
+	//convenience method to make an sos request
 	private void SOS(String note) throws JSONException {
+		//build the request body with essential parameters
 		JSONObject sos = new JSONObject();
 		sos.putOpt("cid", wrapper.getEmail());
 		sos.putOpt("lat", lastLocation.latitude);
 		sos.putOpt("lon", lastLocation.longitude);
 		sos.putOpt("note", note.replace("\n", "\\n"));
+		//make the network request
 		wrapper.getClient()
 			.newCall(wrapper.getPreparedRequest("mutation{newSOS(" +
 				"email:\"" + wrapper.getEmail() + "\" " +
@@ -447,9 +505,11 @@ public class MainActivity extends AppCompatActivity
 			.enqueue(this);
 	}
 	
+	//convenience method to show note dialog if a user wants to create a sos request
 	private void showNoteDialog() {
 		ConstraintLayout root = (ConstraintLayout) LayoutInflater.from(this).inflate(R.layout.dialog_note, findViewById(R.id.root), false);
 		TextInputEditText editText = root.findViewById(R.id.note);
+		//build the dialog
 		dialog = new AlertDialog.Builder(this)
 			.setTitle(R.string.noteTitle)
 			.setIcon(R.drawable.heart)
@@ -467,19 +527,25 @@ public class MainActivity extends AppCompatActivity
 			})
 			.create();
 		dialog.show();
+		//show the keyboard
 		Window window = dialog.getWindow();
 		if (window != null)
 			window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
 	}
 	
+	//convenience method to show or hide the main button in the activity
 	public void setCoordinates(LatLng location) {
 		FloatingActionButton sos = findViewById(R.id.sos);
+		//if the user is client, it's a sos button
 		if (wrapper.getType().equals("client")) {
 			sos.setImageResource(R.drawable.heart);
+			//hide the button if user has already made a request to avoid spamming
 			sos.setVisibility(wrapper.getLatestSOS() == null ? View.VISIBLE : View.GONE);
+			//else it's a navigation button, if we've a navigation location show the button
 		} else if (location != null) {
 			sos.setImageResource(R.drawable.navigation);
 			sos.setVisibility(View.VISIBLE);
+			//else hide it
 		} else sos.setVisibility(GONE);
 	}
 }

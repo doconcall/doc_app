@@ -15,8 +15,8 @@ import java.util.ArrayList;
 
 /**
  * Created by aakash on 10/24/17.
+ * Adapter for user's information
  */
-
 public class InfoAdapter extends RecyclerView.Adapter<InfoAdapter.InfoViewHolder> {
 
 	private ArrayList<InfoItem> infoItems = null;
@@ -83,6 +83,7 @@ public class InfoAdapter extends RecyclerView.Adapter<InfoAdapter.InfoViewHolder
 
 		InfoViewHolder(View itemView, OnItemSelectedListener itemSelectedListener) {
 			super(itemView);
+			//initialize and set this instance as click listeners
 			(title = itemView.findViewById(R.id.title)).setOnClickListener(this);
 			(subtitle = itemView.findViewById(R.id.subtitle)).setOnClickListener(this);
 			this.itemSelectedListener = itemSelectedListener;
@@ -90,11 +91,13 @@ public class InfoAdapter extends RecyclerView.Adapter<InfoAdapter.InfoViewHolder
 
 		@Override
 		public void onClick(View view) {
+			//invoke itemSelectedListener if not null
 			if (item.editable && itemSelectedListener != null)
 				itemSelectedListener.OnItemSelected(this.item, view);
 		}
 
 		void bind(InfoItem item) {
+			//bind the information with this view
 			this.item = item;
 			title.setText(this.item.getTitle());
 			subtitle.setText(this.item.getSubtitle());

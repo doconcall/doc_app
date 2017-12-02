@@ -25,8 +25,8 @@ import static com.davinci.doc.ApplicationWrapper.OnItemSelectedListener;
 
 /**
  * Created by aakash on 10/27/17.
+ * Adapter for sos history and transit history
  */
-
 public class RequestAdapter extends RecyclerView.Adapter<RequestAdapter.RequestViewHolder> {
 
 	private ArrayList<RequestItem> requestItems = null;
@@ -53,7 +53,8 @@ public class RequestAdapter extends RecyclerView.Adapter<RequestAdapter.RequestV
 	public int getItemCount() {
 		return requestItems.size();
 	}
-
+	
+	//sort the source with descending date
 	public void sort() {
 		Collections.sort(this.requestItems, Collections.reverseOrder((r1, r2) -> r1.created.compareTo(r2.created)));
 	}
@@ -106,6 +107,7 @@ public class RequestAdapter extends RecyclerView.Adapter<RequestAdapter.RequestV
 
 		RequestViewHolder(View itemView, OnItemSelectedListener itemSelectedListener) {
 			super(itemView);
+			//initialize this view and set this instance as a click listener
 			root = (ConstraintLayout) ((CardView) itemView).getChildAt(0);
 			root.findViewById(R.id.accept).setOnClickListener(this);
 			root.findViewById(R.id.decline).setOnClickListener(this);
@@ -121,6 +123,7 @@ public class RequestAdapter extends RecyclerView.Adapter<RequestAdapter.RequestV
 
 		@SuppressLint("DefaultLocale")
 		void bind(RequestItem requestItem) {
+			//bind this view with given information
 			if (requestItem == null) return;
 			this.requestItem = requestItem;
 			((TextView) root.findViewById(R.id.requestID)).setText(this.requestItem.id);

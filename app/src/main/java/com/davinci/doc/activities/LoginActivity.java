@@ -48,13 +48,16 @@ public class LoginActivity extends AppCompatActivity
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		wrapper = (ApplicationWrapper) getApplication();
+		//initialize the spinner
 		setContentView(R.layout.activity_login);
 		ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.typeAdapter, R.layout.item_type);
 		adapter.setDropDownViewResource(R.layout.item_type);
 		Spinner spinner = findViewById(R.id.typeSelector);
 		spinner.setAdapter(adapter);
 		spinner.setOnItemSelectedListener(this);
+		
 		findViewById(R.id.accept).setOnClickListener(this);
+		//set text entered in fields if orientation was changed
 		if (savedInstanceState != null) {
 			signingUp = savedInstanceState.getBoolean("signingUp", false);
 			type = savedInstanceState.getString("type", "client");
@@ -70,6 +73,7 @@ public class LoginActivity extends AppCompatActivity
 
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
+		//save text fields' values before orientation change
 		outState.putBoolean("signingUp", signingUp);
 		outState.putString("type", type);
 		outState.putString("email", getEditText(R.id.email).getText().toString());
@@ -82,33 +86,33 @@ public class LoginActivity extends AppCompatActivity
 	}
 
 	@Override
-	protected void onDestroy() {
-		if (result == null) setResult(RESULT_CANCELED);
-		super.onDestroy();
-	}
-
-	@Override
 	public void onClick(View view) {
 		switch (view.getId()) {
+			//we mutate layout to show signup
 			case R.id.signup:
 				signingUp = true;
 				findViewById(R.id.signup).setVisibility(View.GONE);
 				showSignup();
 				break;
+			//method to sign in or sign up
 			case R.id.accept:
 				String email = getEditText(R.id.email).getText().toString().trim(),
 					password = getEditText(R.id.password).getText().toString();
+				//return if invalid values were provided
 				if (email.equals("") || password.equals("")) {
 					Toast.makeText(this, "Please provide valid credentials!", Toast.LENGTH_LONG).show();
 					return;
 				}
+				//return if internet was not accessible
 				if (!ApplicationWrapper.isNetworkConnected(this) || !ApplicationWrapper.isInternetAccessible()) {
 					Toast.makeText(this, "Internet not accessible", Toast.LENGTH_SHORT).show();
 					return;
 				}
+				//show a dialog that we're trying to log in
 				loadingDialog = getLoginDialog();
 				loadingDialog.show();
 				try {
+					//make the sign up or sign in network request
 					wrapper.getClient()
 						.newCall(wrapper.getPreparedRequest(signingUp ?
 							"mutation{" + (type.equals("client") ? "newClient" : type.equals("doctor") ? "newDoctor" : "newTransit") +
@@ -136,24 +140,28 @@ public class LoginActivity extends AppCompatActivity
 	public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
 		String type = ((String) adapterView.getItemAtPosition(i)).toLowerCase();
 		if (type.equals(this.type)) return;
+		//get the selected user type
 		this.type = type.equals("transit service") ? "transit" : type;
+		//return if we're not signing up
 		if (!signingUp) return;
 		showSignup();
 	}
 
 	@Override
 	public void onNothingSelected(AdapterView<?> adapterView) {
+		//set default user type to client
 		((Spinner) findViewById(R.id.typeSelector)).setSelection(0);
 	}
 
 	@Override
 	public void onBackPressed() {
+		//if user has opted to signup, we hide those additional fields
 		if (signingUp) {
 			signingUp = false;
 			hideSignup();
 			return;
 		}
-
+		//else we simply exit
 		super.onBackPressed();
 	}
 
@@ -169,19 +177,22 @@ public class LoginActivity extends AppCompatActivity
 
 	@Override
 	public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+		//dismiss the dialog that shows we're logging in
 		loadingDialog.dismiss();
 		loadingDialog = null;
 		ResponseBody body = response.body();
 		String res = body != null ? body.string() : null;
 		Log.i(ApplicationWrapper.TAG, "onResponse: " + res);
 		runOnUiThread(() -> {
+			//if we've an error, we show appropriate msg
 			String error = res == null ? "Something went wrong" :
 				res.contains("error") ? res.contains("404") ? "Email not found\nPlease signup" : "Provide valid credentials!" : null;
-
 			if (error != null) {
 				runOnUiThread(() -> Toast.makeText(LoginActivity.this, error, Toast.LENGTH_LONG).show());
 				return;
 			}
+			
+			//set those credentials in application
 			try {
 				wrapper.setEmail(getEditText(R.id.email).getText().toString().trim())
 					.setPassword(getEditText(R.id.password).getText().toString())
@@ -190,18 +201,21 @@ public class LoginActivity extends AppCompatActivity
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}
+			//successfully logged in
 			setResult(Activity.RESULT_OK);
+			//we return to the parent activity
 			finish();
 		});
 	}
-
+	
+	//convenience method to toggle the visibility of view with given id
 	private void toggleVisibility(int id, boolean visible) {
 		findViewById(id).setVisibility(visible ? View.VISIBLE : View.GONE);
 	}
-
+	
+	//convenience method for to show additional fields
 	private void showSignup() {
 		if (!signingUp) return;
-		getEditText(R.id.password).setImeOptions(EditorInfo.IME_ACTION_NEXT);
 		toggleVisibility(R.id.signup, false);
 		switch (type) {
 			case "client":
@@ -224,7 +238,8 @@ public class LoginActivity extends AppCompatActivity
 				break;
 		}
 	}
-
+	
+	//convenience method to hide the additional fields
 	private void hideSignup() {
 		if (signingUp) return;
 		getEditText(R.id.password).setImeOptions(EditorInfo.IME_ACTION_GO);
@@ -234,7 +249,8 @@ public class LoginActivity extends AppCompatActivity
 		toggleVisibility(R.id.designation, false);
 		toggleVisibility(R.id.history, false);
 	}
-
+	
+	//convenience method to build the logging in dialog
 	private AlertDialog getLoginDialog() {
 		ConstraintLayout root = (ConstraintLayout) LayoutInflater.from(this).inflate(R.layout.dialog_login, findViewById(R.id.root), false);
 		((TextView) root.findViewById(R.id.content))
@@ -248,11 +264,13 @@ public class LoginActivity extends AppCompatActivity
 			.setCancelable(false)
 			.create();
 	}
-
+	
+	//convenience method to get the editext with given id
 	private EditText getEditText(int Id) {
 		return ((TextInputLayout) findViewById(Id)).getEditText();
 	}
-
+	
+	//convenience method to build the user fields we want to retrieve from the server
 	private String getNewPerson() throws JSONException {
 		JSONObject person = new JSONObject();
 		person.putOpt("email", getEditText(R.id.email).getText().toString().trim());
@@ -273,6 +291,3 @@ public class LoginActivity extends AppCompatActivity
 		return person.toString().replace("\"", "\\\"");
 	}
 }
-/*
-{\"email\":\"dhananjay_reddy@example.com\",\"password\":\"dhananjayreddy\",\"info\":{\"name\":\"Dhananjay Reddy\",\"phone\":9184138915,\"history\":\"MedicalHistory: Labore sapiente dolores dignissimos. Omnis est consequuntur natus est aliquam fuga. Consequuntur eveniet esse velit deserunt temporibus sit.\"}}
- */

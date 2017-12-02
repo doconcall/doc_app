@@ -16,6 +16,7 @@ import okhttp3.ResponseBody;
 
 import static com.davinci.doc.ApplicationWrapper.TAG;
 
+//logs firebase token of the user to the server
 public class TokenRefresh extends FirebaseInstanceIdService {
 	@Override
 	public void onTokenRefresh() {

@@ -42,10 +42,12 @@ public class NewTransitDialog extends AppCompatActivity
 		wrapper = (ApplicationWrapper) getApplication();
 		setContentView(R.layout.activity_newtransit);
 		setIcon();
+		//get the intent this activity was launched with
 		Intent intent = getIntent();
 		if (intent == null)
 			finish();
 		else {
+			//get the request id, latitude and longitude from that intent
 			requestID = intent.getStringExtra("requestID");
 			lat = intent.getDoubleExtra("lat", Double.MAX_VALUE);
 			lon = intent.getDoubleExtra("lon", Double.MAX_VALUE);
@@ -54,6 +56,7 @@ public class NewTransitDialog extends AppCompatActivity
 				return;
 			}
 		}
+		//show keyboard
 		getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
 	}
 
@@ -67,12 +70,14 @@ public class NewTransitDialog extends AppCompatActivity
 					return;
 				}
 				try {
+					//make the network transit request
 					transitRequest(editText.getText().toString());
 				} catch (JSONException e) {
 					e.printStackTrace();
 				}
 				break;
 			case R.id.cancel:
+				//exit since user cancelled it
 				finish();
 				break;
 		}
@@ -89,6 +94,7 @@ public class NewTransitDialog extends AppCompatActivity
 		ResponseBody body = response.body();
 		runOnUiThread(() -> {
 			try {
+				//get the response body and return if we've an error
 				String res = null;
 				if (body == null || (res = body.string()).contains("errors")) {
 					Log.i(TAG, "onError: " + res);
@@ -98,7 +104,9 @@ public class NewTransitDialog extends AppCompatActivity
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+			//show the user we successfully broadcasted the network request
 			Toast.makeText(this, "New transit locationRequest broadcasted", Toast.LENGTH_LONG).show();
+			//launch the google maps with client's coordinates
 			startActivity(new Intent(Intent.ACTION_VIEW,
 				new Uri.Builder()
 					.scheme("https")
@@ -123,7 +131,8 @@ public class NewTransitDialog extends AppCompatActivity
 			actionBar.setIcon(R.drawable.ambulance);
 		}
 	}
-
+	
+	//convenience method to make the network request using the note extracted
 	private void transitRequest(String note) throws JSONException {
 		JSONObject request = new JSONObject();
 		request.putOpt("id", requestID);

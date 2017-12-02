@@ -9,12 +9,16 @@ import java.util.TimerTask;
 
 /**
  * Created by aakash on 10/30/17.
+ * class that holds the details of any user after a positive response
  */
-
 public class PersonDescription extends TimerTask {
+	//email and type of the other user
 	private String id = null, type = null;
+	//details of the user
 	private JSONObject meta = null;
+	//timeout to remove this object after timeout
 	private Timer timeout = new Timer(true);
+	//singleton instance created and held in ApplicationWrapper
 	private ArrayList<PersonDescription> personDescriptions = null;
 
 	public PersonDescription(String id, String type, JSONObject meta) throws JSONException {
@@ -43,7 +47,6 @@ public class PersonDescription extends TimerTask {
 
 	@Override
 	public void run() {
-
 		if (personDescriptions != null)
 			personDescriptions.remove(this);
 	}

@@ -14,6 +14,7 @@ import org.json.JSONObject;
 
 import java.util.Map;
 
+//handles all received notifications
 public class NotificationService extends FirebaseMessagingService {
 	ApplicationWrapper wrapper = null;
 
@@ -29,10 +30,12 @@ public class NotificationService extends FirebaseMessagingService {
 			Notification notif = null;
 			int id = (int) (Math.random() * 1000);
 			switch (title) {
+				//show sos notification
 				case "sos":
 					data = new JSONObject(notification.get("body"));
 					notif = wrapper.getRequestNotification(data.optString("id"), data.optDouble("lat"), data.optDouble("lon"), data.optString("note"), id);
 					break;
+				//show request accepted notification
 				case "accept":
 					data = new JSONObject(notification.get("body"));
 					String requestID = data.optString("requestID");
@@ -41,20 +44,19 @@ public class NotificationService extends FirebaseMessagingService {
 					wrapper.clearExtender();
 					wrapper.setLatestSOS(null);
 					break;
+				//handle request resolved, clear existing notification and invoke the timeouts immediately
 				case "resolved":
 					wrapper.resolve(notification.get("body"));
 					break;
+				//everyone rejected the request
 				case "rejection":
 					wrapper.setLatestSOS(null);
-					//extend range over here
-					/*if(wrapper.getType().equals("client")){
-
-					}*/
 					break;
 			}
 			if (notif != null) {
 				NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 				if (manager == null) return;
+				//show the notification
 				manager.notify(id, notif);
 			}
 			sendBroadcast(new Intent(ApplicationWrapper.ACTION_PUSH_NOTIFICATION));
@@ -62,7 +64,8 @@ public class NotificationService extends FirebaseMessagingService {
 			e.printStackTrace();
 		}
 	}
-
+	
+	//convenience method to add details of the other person upon positive response
 	PersonDescription addNewPerson(String id, String personType, JSONObject person) throws JSONException {
 		return new PersonDescription(id, personType, person)
 			.setTimeout(ApplicationWrapper.PREVIEW_TIMEOUT, wrapper.getPeople());

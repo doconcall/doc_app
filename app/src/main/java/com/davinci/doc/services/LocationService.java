@@ -33,6 +33,7 @@ import okhttp3.ResponseBody;
 import static com.davinci.doc.ApplicationWrapper.TAG;
 import static com.davinci.doc.custom.FusedLocationProvider.LocationChangedListener;
 
+//background service that'll run for doctor and transit service to log their location to server
 public class LocationService extends Service
 	implements LocationChangedListener, Callback {
 
@@ -48,18 +49,23 @@ public class LocationService extends Service
 		new Handler(Looper.getMainLooper())
 			.post(() -> Toast.makeText(this, "Starting Location Service", Toast.LENGTH_SHORT).show());
 		wrapper = (ApplicationWrapper) getApplication();
+		//start in foreground to prevent being killed
 		startForeground(wrapper.setPersistentId((int) (Math.random() * 1000)), getPersistentNotification());
+		//initialize the location provider for location updates
 		locationProvider = new FusedLocationProvider(this, this);
+		//start receiving updates
 		locationProvider.getUpdates(request);
 		return START_STICKY;
 	}
 
 	@Override
 	public void onDestroy() {
+		//stop receiving location update
 		if (locationProvider != null) {
 			locationProvider.stopUpdates();
 			locationProvider = null;
 		}
+		//reset the persistent notification id
 		wrapper.setPersistentId(-1);
 		Log.i(TAG, "onDestroy: stopping location service");
 		super.onDestroy();
@@ -72,9 +78,11 @@ public class LocationService extends Service
 
 	@Override
 	public void onLastLocation(List<Location> locations) {
+		//if we don't have internet connection, we return
 		if (!ApplicationWrapper.isNetworkConnected(getApplicationContext()) || !ApplicationWrapper.isInternetAccessible())
 			return;
 		try {
+			//get the location and make the network request to log it to the server
 			Location location = locations.get(0);
 			wrapper.getClient()
 				.newCall(wrapper.getPreparedRequest(getBody(location.getLatitude(), location.getLongitude()), "updateLocation"))
@@ -89,6 +97,7 @@ public class LocationService extends Service
 		if (!ApplicationWrapper.isNetworkConnected(getApplicationContext()) || !ApplicationWrapper.isInternetAccessible())
 			return;
 		try {
+			//get the location and make the network request to log it to the server
 			Location location = locations.get(0);
 			wrapper.getClient()
 				.newCall(wrapper.getPreparedRequest(getBody(location.getLatitude(), location.getLongitude()), "updateLocation"))
@@ -106,6 +115,7 @@ public class LocationService extends Service
 	@Override
 	public void onResponse(@NonNull Call call, @NonNull Response response) {
 		try {
+			//log the response body, nothing else to do here
 			ResponseBody body = response.body();
 			if (body != null)
 				Log.i(TAG, "onResponse: " + body.string());
@@ -113,7 +123,8 @@ public class LocationService extends Service
 			e.printStackTrace();
 		}
 	}
-
+	
+	//convenience method to build the notification
 	private Notification getPersistentNotification() {
 		return new NotificationCompat.Builder(this, ApplicationWrapper.locationChannel.first)
 			.setContentTitle("DOC Location Service")
@@ -124,7 +135,8 @@ public class LocationService extends Service
 				new Intent(getApplicationContext(), MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT))
 			.build();
 	}
-
+	
+	//convenience method to build the request body with latitude and longitude
 	@NonNull
 	private String getBody(double lat, double lon) throws JSONException {
 		JSONObject parsed = new JSONObject();

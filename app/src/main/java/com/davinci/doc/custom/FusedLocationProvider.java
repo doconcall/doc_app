@@ -18,9 +18,8 @@ import java.util.List;
 /**
  * Created by aakash on 9/20/17.
  * Custom location provider extended from the native api
- * handle all the clean up and irrelevant stubs
+ * handles all the clean up and irrelevant stubs
  */
-
 public class FusedLocationProvider extends LocationCallback
 	implements OnSuccessListener<Location> {
 	private FusedLocationProviderClient locationProvider;
@@ -30,7 +29,7 @@ public class FusedLocationProvider extends LocationCallback
 		locationProvider = new FusedLocationProviderClient(context);
 		this.locationChangedListener = locationChangedListener;
 	}
-
+	
 	public void getUpdates(LocationRequest request) {
 		if (this.locationProvider == null || ActivityCompat.checkSelfPermission(locationProvider.getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
 			return;
@@ -56,7 +55,8 @@ public class FusedLocationProvider extends LocationCallback
 		locations.add(location);
 		this.locationChangedListener.onLastLocation(locations);
 	}
-
+	
+	//custom callback if location is available
 	public interface LocationChangedListener {
 		void onLastLocation(List<Location> locations);
 
